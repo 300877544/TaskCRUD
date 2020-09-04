@@ -3,11 +3,13 @@ package com.dexlock.task.controller;
 import com.dexlock.task.config.JwtTokenUtil;
 import com.dexlock.task.message.ResponseFile;
 import com.dexlock.task.message.ResponseMessage;
+import com.dexlock.task.models.Comments;
 import com.dexlock.task.models.FileDB;
 import com.dexlock.task.models.Task;
 import com.dexlock.task.models.User;
 import com.dexlock.task.payload.response.JwtResponse;
 import com.dexlock.task.payload.response.JwtResponses;
+import com.dexlock.task.repository.CommentRepository;
 import com.dexlock.task.services.JwtUserDetailsService;
 import com.dexlock.task.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,11 +25,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import javax.servlet.http.HttpServletRequest;
+import java.util.Calendar;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-//@RequestMapping("/api/auth")
 @CrossOrigin
 public class JwtAuthenticationController {
     @Autowired
@@ -41,6 +44,9 @@ public class JwtAuthenticationController {
 
     @Autowired
     private UserService service;
+
+    @Autowired
+    private CommentRepository commentRepository;
 
     @PostMapping("/authenticate")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody User authenticationRequest) throws Exception{
@@ -63,11 +69,33 @@ public class JwtAuthenticationController {
 
 
     @PostMapping("/user")
-    public User addUser(@RequestBody User user)
+    public User addUser(@RequestBody User user, HttpServletRequest request)
     {
-        return service.saveUser(user);
-    }
+        String jwtToken = null;
+        String username = null;
+        final String requestTokenHeader = request.getHeader("Authorization");
+        jwtToken = requestTokenHeader.substring(7);
+        username = jwtTokenUtil.getUsernameFromToken(jwtToken);
+        if(username.equals("super-admin"))
+        {
+            return service.saveUser(user);
+        }
+        return null;
 
+    }
+    @PostMapping("/comments")
+    public Comments saveComment(@RequestBody Comments comments, HttpServletRequest request)
+    {
+        String jwtToken = null;
+        String username = null;
+        final  String requestTokenHeader = request.getHeader("Authorization");
+        jwtToken = requestTokenHeader.substring(7);
+        username = jwtTokenUtil.getUsernameFromToken(jwtToken);
+        comments.setUsername(username);
+        Calendar calendar = Calendar.getInstance();
+        comments.setUpdatedTime(calendar.getTimeInMillis());
+        return commentRepository.save(comments);
+    }
     @PostMapping("/task")
     public Task addTask(@RequestBody Task task)
     {
@@ -76,6 +104,19 @@ public class JwtAuthenticationController {
 
     @PutMapping("/task")
     public Task updateTask(@RequestBody Task task){ return service.updateTask(task);}
+
+    @PutMapping("/comments")
+    public Comments updateComments(@RequestBody Comments comments, HttpServletRequest request){
+        Comments existingComments = commentRepository.findById(comments.getId()).orElse(null);
+        String jwtToken = null;
+        String username = null;
+        final  String requestTokenHeader = request.getHeader("Authorization");
+        jwtToken = requestTokenHeader.substring(7);
+        username = jwtTokenUtil.getUsernameFromToken(jwtToken);
+        existingComments.setUsername(username);
+        Calendar calendar = Calendar.getInstance();
+        existingComments.setUpdatedTime(calendar.getTimeInMillis());
+        return commentRepository.save(comments);}
 
 
     @PostMapping("/upload")
